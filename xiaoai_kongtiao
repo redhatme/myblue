@@ -1,0 +1,209 @@
+blueprint:
+  name: "小爱对话联动空调"
+  description: "根据小爱的对话，来联动空调"
+  domain: automation
+  #source_url: ""
+  author: "HA智能家居店"
+  input:
+    xiaoai_entity:
+      name: 小爱对话的那个实体
+      description: 带conversation这个的实体
+      selector:
+        entity:
+          filter:
+            #device_class:
+            domain: sensor
+
+    climate_entity:
+      name: 选择空调
+      description: "选择需要小爱控制的空调"
+      selector:
+        entity:
+          filter:
+            #device_class:
+            domain: climate
+    sensor_entity:
+      name: 选择季节
+      description: "选择季节"
+      selector:
+        entity:
+          filter:
+            #device_class:
+            domain: sensor
+    text1_entity:
+      name: 空调的名字
+      description: 要控制什么空调这里就写哪个空调的名字
+      selector:
+        text:
+
+variables:
+  climate_name: !input text1_entity
+
+triggers:
+  - trigger: state
+    entity_id: !input xiaoai_entity
+conditions:
+  - condition: template
+    value_template: " {{ climate_name in trigger.to_state.state and (trigger.to_state|default(0))
+      and as_timestamp(now()) -\n   as_timestamp(trigger.to_state.attributes.timestamp)
+      < 60 }}"
+actions:
+  - if:
+    - condition: template
+      value_template: '{{ ''打开'' in trigger.to_state.state }}'
+    then:
+    - if:
+      - condition: state
+        entity_id: !input sensor_entity
+        state: winter
+      then:
+      - action: climate.set_hvac_mode
+        metadata: {}
+        data:
+          hvac_mode: heat
+        target:
+          entity_id: !input climate_entity
+      alias: 冬季
+    - if:
+      - condition: state
+        entity_id: !input sensor_entity
+        state: autumn
+      then:
+      - action: climate.set_hvac_mode
+        metadata: {}
+        data:
+          hvac_mode: heat
+        target:
+          entity_id: !input climate_entity
+      alias: 秋季
+    - if:
+      - condition: state
+        entity_id: !input sensor_entity
+        state: spring
+      then:
+      - action: climate.set_hvac_mode
+        metadata: {}
+        data:
+          hvac_mode: cool
+        target:
+          entity_id: !input climate_entity
+      alias: 春季
+    - if:
+      - condition: state
+        entity_id: !input sensor_entity
+        state: summer
+      then:
+      - action: climate.set_hvac_mode
+        metadata: {}
+        data:
+          hvac_mode: cool
+        target:
+          entity_id: !input climate_entity
+      alias: 夏天
+
+    alias: 开空调
+  - if:
+    - condition: template
+      value_template: '{{ ''关闭'' in trigger.to_state.state }}'
+    then:
+    - action: climate.set_hvac_mode
+      metadata: {}
+      data:
+        hvac_mode: 'off'
+      target:
+        entity_id: !input climate_entity
+    alias: 关闭空调
+  - if:
+    - condition: template
+      value_template: '{{ ''制热'' in trigger.to_state.state }}'
+    then:
+    - action: climate.set_hvac_mode
+      metadata: {}
+      data:
+        hvac_mode: heat
+      target:
+        entity_id: !input climate_entity
+    alias: 制热
+  - alias: 制冷
+    if:
+    - condition: template
+      value_template: '{{ ''制冷'' in trigger.to_state.state }}'
+    then:
+    - action: climate.set_hvac_mode
+      metadata: {}
+      data:
+        hvac_mode: cool
+      target:
+        entity_id: !input climate_entity
+  - alias: 除湿
+    if:
+    - condition: template
+      value_template: '{{ ''除湿'' in trigger.to_state.state }}'
+    then:
+    - action: climate.set_hvac_mode
+      metadata: {}
+      data:
+        hvac_mode: dry
+      target:
+        entity_id: !input climate_entity
+  - alias: 自动
+    if:
+    - condition: template
+      value_template: '{{ ''自动'' in trigger.to_state.state }}'
+    then:
+    - action: climate.set_hvac_mode
+      metadata: {}
+      data:
+        hvac_mode: auto
+      target:
+        entity_id: !input climate_entity
+  - if:
+    - condition: template
+      value_template: '{{''风速'' in trigger.to_state.state or ''风量'' in trigger.to_state.state
+        }}'
+    then:
+    - if:
+      - condition: template
+        value_template: '{{''中速'' in trigger.to_state.state or ''高速'' in trigger.to_state.state
+          or ''低速'' in trigger.to_state.state or ''一挡'' in trigger.to_state.state
+          or ''二挡'' in trigger.to_state.state or ''三挡'' in trigger.to_state.state
+          or ''自动'' in trigger.to_state.state}}'
+      then:
+      - action: climate.set_fan_mode
+        target:
+          entity_id: !input climate_entity
+        data:
+          fan_mode: "{% set sentence = trigger.to_state.state %} {% set speed_map
+            = {\n \"高速\":'high','低速':'low','中速':'medium','一挡':'low','二挡':'medium',
+            '三挡':'high','自动':'auto'\n} %} {% set found_speed = namespace(value=None)
+            %} {% for number, value in speed_map.items() %}\n  {% if number in sentence
+            %}\n    {% set found_speed.value = value %}\n    {% break %}\n  {% endif
+            %}\n{% endfor %}\n{{ found_speed.value }}\n"
+    alias: 风速
+  - alias: 温度
+    if:
+    - condition: template
+      value_template: '{{''温度'' in trigger.to_state.state or ''度'' in trigger.to_state.state
+        }}'
+    then:
+    - action: climate.set_temperature
+      target:
+        entity_id: !input climate_entity
+      data:
+        temperature: "{% set sentence = trigger.to_state.state %} {% set number_map
+          = {\n  '六十五': 65, '六十四': 64, '六十三': 63, '六十二': 62, '六十一': 61,\n  '六十': 60,
+          '五十九': 59, '五十八': 58, '五十七': 57, '五十六': 56,\n  '五十五': 55, '五十四': 54, '五十三':
+          53, '五十二': 52, '五十一': 51,\n  '五十': 50, '四十九': 49, '四十八': 48, '四十七': 47,
+          '四十六': 46,\n  '四十五': 45, '四十四': 44, '四十三': 43, '四十二': 42, '四十一': 41,\n  '四十':
+          40, '三十九': 39, '三十八': 38, '三十七': 37, '三十六': 36,\n  '三十五': 35, '三十四': 34,
+          '三十三': 33, '三十二': 32, '三十一': 31,\n  '三十': 30, '二十九': 29, '二十八': 28, '二十七':
+          27, '二十六': 26,\n  '二十五': 25, '二十四': 24, '二十三': 23, '二十二': 22, '二十一': 21,\n
+          \ '二十': 20, '十九': 19, '十八': 18, '十七': 17, '十六': 16,\n  '十五': 15, '十四': 14,
+          '十三': 13, '十二': 12, '十一': 11,\n  '十': 10, '九': 9, '八': 8, '七': 7, '六': 6,\n
+          \ '五': 5\n} %} {% set found_number = namespace(value=None) %} {% for number,
+          value in number_map.items() %}\n  {% if number in sentence %}\n    {% set
+          found_number.value = value %}\n    {% break %}\n  {% endif %}\n{% endfor
+          %} {% if found_number.value is not none and 5 < found_number.value < 70
+          %}\n  {{ found_number.value }}\n{% else %}\n  {{ false }}  # 默认温度，如果找不到合适的温度或温度不在合理范围内\n{%
+          endif %}\n"
+ # mode: single
