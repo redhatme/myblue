@@ -206,4 +206,3 @@ actions:
           %} {% if found_number.value is not none and 5 < found_number.value < 70
           %}\n  {{ found_number.value }}\n{% else %}\n  {{ false }}  # 默认温度，如果找不到合适的温度或温度不在合理范围内\n{%
           endif %}\n"
- # mode: single
